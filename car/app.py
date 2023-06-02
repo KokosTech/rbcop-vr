@@ -4,81 +4,44 @@ import uvicorn
 from fastapi import FastAPI, HTTPException, Request, status
 from fastapi.responses import Response, StreamingResponse
 from fastapi.templating import Jinja2Templates
+from pydantic import BaseModel
+from gpiozero import Motor
+from dotenv import load_dotenv
+load_dotenv()
+import os
 
-en1 = 25
-in1 = 23
-in2 = 24
+# define pin constants
+enA = 22
+in1 = 27
+in2 = 17
 
-en2 = 22
-in3 = 17
-in4 = 27
+enB = 25
+in3 = 24
+in4 = 23
 
-lowSpeed = 50
-medSpeed = 75
-maxSpeed = 100
-
-pwm_en_1 = None
-pwm_en_2 = None
+# define speed
+speed = 0.65
 
 
+motorA = motorB = None
+
+# setup gpio pins
 def setup():
-    GPIO.cleanup()
-
-    global pwm_en_1, pwm_en_2
-
-    GPIO.setmode(GPIO.BCM)
-
-    GPIO.setup(en1, GPIO.OUT)
-    GPIO.setup(in1, GPIO.OUT)
-    GPIO.setup(in2, GPIO.OUT)
-
-    GPIO.output(in1, GPIO.LOW)
-    GPIO.output(in2, GPIO.LOW)
-
-    GPIO.setup(en2, GPIO.OUT)
-    GPIO.setup(in3, GPIO.OUT)
-    GPIO.setup(in4, GPIO.OUT)
-
-    GPIO.output(in3, GPIO.LOW)
-    GPIO.output(in4, GPIO.LOW)
-
-    pwm_en_1 = GPIO.PWM(en1, 1000)
-    pwm_en_2 = GPIO.PWM(en2, 1000)
-
-    pwm_en_1.start(65)
-    pwm_en_2.start(65)
-
-
-def enable_movement():
-    GPIO.output(en1, GPIO.HIGH)
-    GPIO.output(en2, GPIO.HIGH)
-
-
-def forward(pin1: int, pin2: int):
-	GPIO.output(pin1, GPIO.HIGH)
-	GPIO.output(pin2, GPIO.LOW)
-
-
-def backward(pin1: int, pin2: int):
-	GPIO.output(pin1, GPIO.LOW)
-	GPIO.output(pin2, GPIO.HIGH)
-
-
-def stop(pin1: int, pin2: int):
-	GPIO.output(pin1, GPIO.LOW)
-	GPIO.output(pin2, GPIO.LOW)
-
+    global motorA, motorB
+    
+    # define the motor objects
+    motorA = Motor(in1, in2, enable=enA, pwm=True)
+    motorB = Motor(in3, in4, enable=enB, pwm=True)
 
 app = FastAPI()
-templates = Jinja2Templates(directory="templates")
 
-
-class Movement:
+class Movement(BaseModel):
     sensor: str
     angle_data: list
 
 
 class CameraCapture:
+    # 
     camera = cv2.VideoCapture(0)
 
     def gen_frames(self):
@@ -95,49 +58,40 @@ class CameraCapture:
 
 camera = CameraCapture()
 
-
-@app.get('/')
-def index(request: Request):
-    return {"hello": "world"}
-
-
+# define a controller route for video
 @app.get('/video_feed')
 def video_feed():
     return StreamingResponse(camera.gen_frames(), media_type='multipart/x-mixed-replace; boundary=frame')
 
 
-@app.get('/snap')
-def snap_pic():
-    return Response(camera.snap(), media_type='image/jpeg')
-
-
+# define a controller route for the movements
 @app.post('/movement')
-async def move(request: Request):
-    json = await request.json()
-
-    if json['angle_data'][0] >= 7:
-        forward(in1, in2)
-        stop(in3, in4)
+def move(movement: Movement):
+    if movement.angle_data[0] >= 390:
+        motorA.forward(speed)
+        motorB.stop()
         print('rigth')
-
-    elif json['angle_data'][0] <= -7:
+    elif movement.angle_data[0] <= 300:
+        motorA.stop()
+        motorB.forward(speed)
         print('left')
-        forward(in3, in4)
-        stop(in1, in2)
-    elif json['angle_data'][1] <= -5:
+    elif movement.angle_data[1] <= 290:
+        motorA.backward(speed)
+        motorB.backward(speed)
         print('backward')
-        backward(in1, in2)
-        backward(in3, in4)
-    elif json['angle_data'][1] >= 5:
-        forward(in1, in2)
-        forward(in3, in4)
+    elif movement.angle_data[1] >= 400:
+        motorA.forward(speed)
+        motorB.forward(speed)
         print('forward')
     else:
+        motorA.stop()
+        motorB.stop()
         print('stop')
-        stop(in1, in2)
-        stop(in3, in4)
 
 if __name__ == '__main__':
+    # call the setup function to initialize the pins
     setup()
-    enable_movement()
-    uvicorn.run(app, host='0.0.0.0', port=8000)
+    # run the server
+    uvicorn.run(app, host=os.environ.get("host"), port=int(os.environ.get("port")))
+    # cleanup the gpio pins
+    GPIO.cleanup()
