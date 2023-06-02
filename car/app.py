@@ -3,7 +3,6 @@ import RPi.GPIO as GPIO
 import uvicorn
 from fastapi import FastAPI, HTTPException, Request, status
 from fastapi.responses import Response, StreamingResponse
-from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel
 from gpiozero import Motor
 from dotenv import load_dotenv
