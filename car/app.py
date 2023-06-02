@@ -12,12 +12,12 @@ import os
 
 # define pin constants
 enA = 22
-in1 = 27
-in2 = 17
+in1 = 17
+in2 = 27
 
 enB = 25
-in3 = 24
-in4 = 23
+in3 = 23
+in4 = 24
 
 # define speed
 speed = 0.65
@@ -30,8 +30,8 @@ def setup():
     global motorA, motorB
     
     # define the motor objects
-    motorA = Motor(in1, in2, enable=enA, pwm=True)
-    motorB = Motor(in3, in4, enable=enB, pwm=True)
+    motorA = Motor(in2, in1, enable=enA, pwm=True)
+    motorB = Motor(in4, in3, enable=enB, pwm=True)
 
 app = FastAPI()
 
@@ -79,7 +79,7 @@ def move(movement: Movement):
         motorA.backward(speed)
         motorB.backward(speed)
         print('backward')
-    elif movement.angle_data[1] >= 400:
+    elif movement.angle_data[1] >= 390:
         motorA.forward(speed)
         motorB.forward(speed)
         print('forward')
