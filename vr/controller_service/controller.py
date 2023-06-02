@@ -20,7 +20,7 @@ while True:
 
     requests.post("http://192.168.1.244:8000/movement", json=data)
 
-    time.sleep(0.5)
+    time.sleep(700)
 
 bluetooth.close()
 print("Done")
